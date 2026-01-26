@@ -11,7 +11,12 @@ function startPythonService() {
   const pythonScript = path.join(process.cwd(), "python", "nlp_service.py");
   console.log("Starting Python NLP Service...", pythonScript);
 
-  const pythonProcess = spawn("python3", [pythonScript]);
+  // Use python3 if available, fallback to python
+  const pythonCmd = process.platform === "win32" ? "python" : "python3";
+  
+  const pythonProcess = spawn(pythonCmd, [pythonScript], {
+    env: { ...process.env, PYTHONUNBUFFERED: "1" }
+  });
 
   pythonProcess.stdout.on("data", (data) => {
     console.log(`[Python]: ${data}`);
@@ -23,6 +28,7 @@ function startPythonService() {
 
   pythonProcess.on("close", (code) => {
     console.log(`Python process exited with code ${code}`);
+    // Optional: Restart logic if needed
   });
   
   return pythonProcess;
@@ -49,15 +55,15 @@ export async function registerRoutes(
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Python service error: ${errorText}`);
+          const errorData = await response.json().catch(() => ({ message: "Unknown error" }));
+          return res.status(response.status).json(errorData);
         }
 
         const data = await response.json();
         res.json(data);
       } catch (err) {
         console.error("Failed to call Python service:", err);
-        res.status(500).json({ message: "NLP Service unavailable. Model may be loading." });
+        res.status(503).json({ message: "NLP Service is currently loading or unavailable. Please wait a moment and try again." });
       }
 
     } catch (err) {
