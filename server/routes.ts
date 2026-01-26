@@ -19,7 +19,8 @@ function startPythonService() {
   const pythonScript = path.join(process.cwd(), "python", "nlp_service.py");
   console.log("Starting Python NLP Service...", pythonScript);
 
-  const pythonCmd = process.platform === "win32" ? "python" : "python3";
+  // In production/published environments, python3 is standard
+  const pythonCmd = "python3";
   
   pythonProcessInstance = spawn(pythonCmd, [pythonScript], {
     env: { ...process.env, PYTHONUNBUFFERED: "1" },
@@ -39,11 +40,16 @@ function startPythonService() {
     pythonProcessInstance = null;
     // Auto-restart if it crashes
     if (code !== 0) {
-      console.log("Restarting Python service in 2 seconds...");
-      setTimeout(startPythonService, 2000);
+      console.log("Restarting Python service in 5 seconds...");
+      setTimeout(startPythonService, 5000);
     }
   });
   
+  pythonProcessInstance.on("error", (err: Error) => {
+    console.error("Failed to start Python process:", err);
+    pythonProcessInstance = null;
+  });
+
   return pythonProcessInstance;
 }
 
@@ -77,7 +83,7 @@ export async function registerRoutes(
       } catch (err) {
         console.error("Failed to call Python service:", err);
         res.status(503).json({ 
-          message: "NLP Service is initializing (downloading ~66MB model). This usually takes 30-60 seconds on the first run. Please try again in a moment." 
+          message: "NLP Service is initializing. This usually takes 30-60 seconds on the first run after publishing. Please try again in a moment." 
         });
       }
 

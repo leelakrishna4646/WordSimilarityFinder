@@ -22,14 +22,15 @@ model = None
 def load_model():
     global model
     try:
-        # Replit usually stores data in /home/runner/
+        # Use a persistent path that works in both preview and published environments
+        # /home/runner/ is standard for Replit
         data_dir = os.path.join(os.path.expanduser("~"), "gensim-data")
         os.makedirs(data_dir, exist_ok=True)
         os.environ['GENSIM_DATA_DIR'] = data_dir
         
         logger.info(f"Loading Word2Vec model (glove-wiki-gigaword-50) from {data_dir}...")
         # Load a small pre-trained model (approx 66MB)
-        # This will download if not present
+        # This will download if not present. In published apps, this happens on first startup.
         model = api.load("glove-wiki-gigaword-50")
         logger.info("Model loaded successfully and ready for requests!")
     except Exception as e:
@@ -40,7 +41,7 @@ def similarity():
     if model is None:
         logger.warning("Request received but model is not yet loaded.")
         return jsonify({
-            "message": "NLP Model is still downloading/loading (~66MB). This takes about 30-60 seconds on first run. Please wait a bit longer."
+            "message": "NLP Model is still downloading/loading (~66MB). This takes about 30-60 seconds on first run after publishing. Please wait a bit longer."
         }), 503
 
     try:
@@ -78,12 +79,8 @@ def similarity():
         return jsonify({"message": "An error occurred while processing the request."}), 500
 
 if __name__ == '__main__':
-    # BIND TO ALL INTERFACES but Node gateway calls 127.0.0.1
-    # Port 5001
-    from threading import Thread
-    
-    # Load model in a separate thread to not block flask startup if needed, 
-    # but here we want to ensure it's loaded before serving correctly.
-    # Actually, we'll load it and then run.
+    # Load model on startup
     load_model()
-    app.run(host='0.0.0.0', port=5001, debug=False, use_reloader=False)
+    # Bind to 127.0.0.1 for local communication between Node and Python
+    # Use port 5001
+    app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)
