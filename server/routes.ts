@@ -6,51 +6,30 @@ import { z } from "zod";
 import { spawn } from "child_process";
 import path from "path";
 
-// Keep track of the Python process globally to prevent multiple instances
-let pythonProcessInstance: any = null;
-
 // Function to start Python microservice
 function startPythonService() {
-  if (pythonProcessInstance) {
-    console.log("Python NLP Service is already running.");
-    return pythonProcessInstance;
-  }
-
   const pythonScript = path.join(process.cwd(), "python", "nlp_service.py");
   console.log("Starting Python NLP Service...", pythonScript);
 
-  // In production/published environments, python3 is standard
   const pythonCmd = "python3";
   
-  pythonProcessInstance = spawn(pythonCmd, [pythonScript], {
-    env: { ...process.env, PYTHONUNBUFFERED: "1" },
-    stdio: 'pipe'
+  const pythonProcess = spawn(pythonCmd, [pythonScript], {
+    env: { ...process.env, PYTHONUNBUFFERED: "1" }
   });
 
-  pythonProcessInstance.stdout.on("data", (data: Buffer) => {
-    console.log(`[Python]: ${data.toString()}`);
+  pythonProcess.stdout.on("data", (data) => {
+    console.log(`[Python]: ${data}`);
   });
 
-  pythonProcessInstance.stderr.on("data", (data: Buffer) => {
-    console.error(`[Python Error]: ${data.toString()}`);
+  pythonProcess.stderr.on("data", (data) => {
+    console.error(`[Python Error]: ${data}`);
   });
 
-  pythonProcessInstance.on("close", (code: number) => {
+  pythonProcess.on("close", (code) => {
     console.log(`Python process exited with code ${code}`);
-    pythonProcessInstance = null;
-    // Auto-restart if it crashes
-    if (code !== 0) {
-      console.log("Restarting Python service in 5 seconds...");
-      setTimeout(startPythonService, 5000);
-    }
   });
   
-  pythonProcessInstance.on("error", (err: Error) => {
-    console.error("Failed to start Python process:", err);
-    pythonProcessInstance = null;
-  });
-
-  return pythonProcessInstance;
+  return pythonProcess;
 }
 
 export async function registerRoutes(
@@ -67,13 +46,11 @@ export async function registerRoutes(
       
       // Forward to Python service
       try {
-        // Use 0.0.0.0 or 127.0.0.1 - matching Python service bind
+        // Use 127.0.0.1 and port 5001 - matching Python service bind
         const response = await fetch("http://127.0.0.1:5001/similarity", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(input),
-          // Set a timeout
-          signal: AbortSignal.timeout(30000)
+          body: JSON.stringify(input)
         });
 
         if (!response.ok) {
@@ -83,11 +60,8 @@ export async function registerRoutes(
 
         const data = await response.json();
         res.json(data);
-      } catch (err: any) {
+      } catch (err) {
         console.error("Failed to call Python service:", err);
-        if (err.name === 'TimeoutError') {
-          return res.status(504).json({ message: "NLP Service timed out. The model might be loading large amounts of data. Please try again." });
-        }
         res.status(503).json({ 
           message: "NLP Service is initializing. This usually takes 30-60 seconds on the first run after publishing. Please try again in a moment." 
         });
