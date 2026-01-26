@@ -6,30 +6,51 @@ import { z } from "zod";
 import { spawn } from "child_process";
 import path from "path";
 
+// Keep track of the Python process globally to prevent multiple instances
+let pythonProcessInstance: any = null;
+
 // Function to start Python microservice
 function startPythonService() {
+  if (pythonProcessInstance) {
+    console.log("Python NLP Service is already running.");
+    return pythonProcessInstance;
+  }
+
   const pythonScript = path.join(process.cwd(), "python", "nlp_service.py");
   console.log("Starting Python NLP Service...", pythonScript);
 
+  // In production/published environments, python3 is standard
   const pythonCmd = "python3";
   
-  const pythonProcess = spawn(pythonCmd, [pythonScript], {
-    env: { ...process.env, PYTHONUNBUFFERED: "1" }
+  pythonProcessInstance = spawn(pythonCmd, [pythonScript], {
+    env: { ...process.env, PYTHONUNBUFFERED: "1" },
+    stdio: 'pipe'
   });
 
-  pythonProcess.stdout.on("data", (data) => {
-    console.log(`[Python]: ${data}`);
+  pythonProcessInstance.stdout.on("data", (data: Buffer) => {
+    console.log(`[Python]: ${data.toString()}`);
   });
 
-  pythonProcess.stderr.on("data", (data) => {
-    console.error(`[Python Error]: ${data}`);
+  pythonProcessInstance.stderr.on("data", (data: Buffer) => {
+    console.error(`[Python Error]: ${data.toString()}`);
   });
 
-  pythonProcess.on("close", (code) => {
+  pythonProcessInstance.on("close", (code: number) => {
     console.log(`Python process exited with code ${code}`);
+    pythonProcessInstance = null;
+    // Auto-restart if it crashes
+    if (code !== 0) {
+      console.log("Restarting Python service in 5 seconds...");
+      setTimeout(startPythonService, 5000);
+    }
   });
   
-  return pythonProcess;
+  pythonProcessInstance.on("error", (err: Error) => {
+    console.error("Failed to start Python process:", err);
+    pythonProcessInstance = null;
+  });
+
+  return pythonProcessInstance;
 }
 
 export async function registerRoutes(
