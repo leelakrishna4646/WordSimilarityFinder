@@ -11,7 +11,7 @@ function startPythonService() {
   if (pythonProcessInstance) return pythonProcessInstance;
 
   const pythonScript = path.join(process.cwd(), "python", "nlp_service.py");
-  const pythonCmd = "python3";
+  const pythonCmd = process.platform === "win32" ? "python" : "python3";
   
   pythonProcessInstance = spawn(pythonCmd, [pythonScript], {
     env: { ...process.env, PYTHONUNBUFFERED: "1" },
