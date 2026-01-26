@@ -14,6 +14,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+# Allow CORS from everywhere for internal proxying
 CORS(app)
 
 # Global variable for the model
@@ -57,7 +58,7 @@ def similarity():
 
         if word not in model:
             logger.info(f"Word not in vocabulary: {word}")
-            return jsonify({"message": f"Sorry, '{word}' is not in our 400k-word vocabulary. Try 'computer', 'science', or 'happy'."}), 404
+            return jsonify({"message": f"Sorry, '{word}' is not in our vocabulary. Try 'computer', 'science', or 'happy'."}), 404
 
         # Find most similar words
         similar_words = model.most_similar(word, topn=top_k)
@@ -81,6 +82,6 @@ def similarity():
 if __name__ == '__main__':
     # Load model on startup
     load_model()
-    # Bind to 127.0.0.1 for local communication between Node and Python
-    # Use port 5001
-    app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)
+    # Bind to 0.0.0.0 and port 5001
+    # Node gateway calls 127.0.0.1:5001
+    app.run(host='0.0.0.0', port=5001, debug=False, use_reloader=False)

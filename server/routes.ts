@@ -67,10 +67,13 @@ export async function registerRoutes(
       
       // Forward to Python service
       try {
+        // Use 0.0.0.0 or 127.0.0.1 - matching Python service bind
         const response = await fetch("http://127.0.0.1:5001/similarity", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(input)
+          body: JSON.stringify(input),
+          // Set a timeout
+          signal: AbortSignal.timeout(30000)
         });
 
         if (!response.ok) {
@@ -80,8 +83,11 @@ export async function registerRoutes(
 
         const data = await response.json();
         res.json(data);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to call Python service:", err);
+        if (err.name === 'TimeoutError') {
+          return res.status(504).json({ message: "NLP Service timed out. The model might be loading large amounts of data. Please try again." });
+        }
         res.status(503).json({ 
           message: "NLP Service is initializing. This usually takes 30-60 seconds on the first run after publishing. Please try again in a moment." 
         });
