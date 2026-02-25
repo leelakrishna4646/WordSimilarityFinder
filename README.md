@@ -43,5 +43,4 @@ This project is adapted for the Replit environment:
 - software (0.85)
 - technology (0.82)
 - electronic (0.79)
-- computing (0.78)
-- internet (0.76)
+
